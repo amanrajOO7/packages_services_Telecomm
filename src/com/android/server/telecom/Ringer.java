@@ -243,6 +243,8 @@ public class Ringer {
     private Handler mHandler = null;
     private int torchMode;
 
+    private boolean mBlinkActive;
+
     /** Initializes the Ringer. */
     @VisibleForTesting
     public Ringer(
@@ -439,7 +441,8 @@ public class Ringer {
             shouldFlash = zenMode == Settings.Global.ZEN_MODE_OFF;
         }
 
-        if (shouldFlash) {
+        if (shouldFlash && !mBlinkActive) {
+            mBlinkActive = true;
             blinkFlashlight();
         }
 
@@ -529,6 +532,8 @@ public class Ringer {
     }
 
     public void startCallWaiting(Call call, String reason) {
+        mBlinkActive = false;
+
         if (mSystemSettingsUtil.isTheaterModeOn(mContext)) {
             return;
         }
@@ -567,8 +572,8 @@ public class Ringer {
             mRingingCall = null;
         }
 
+        mBlinkActive = false;
         mRingtonePlayer.stop();
-        torchToggler.stop();
 
         // If we haven't started vibrating because we were waiting for the haptics info, cancel
         // it and don't vibrate at all.
@@ -773,7 +778,6 @@ public class Ringer {
 
     private class TorchToggler extends AsyncTask {
 
-        private boolean shouldStop = false;
         private CameraManager cameraManager;
         private int duration;
         private boolean hasFlash = true;
@@ -791,16 +795,12 @@ public class Ringer {
                     Settings.System.FLASHLIGHT_ON_CALL_RATE, 1, UserHandle.USER_CURRENT);
         }
 
-        void stop() {
-            shouldStop = true;
-        }
-
         @Override
         protected Object doInBackground(Object[] objects) {
             if (hasFlash) {
                 try {
                     String cameraId = cameraManager.getCameraIdList()[0];
-                    while (!shouldStop) {
+                    while (mBlinkActive) {
                         cameraManager.setTorchMode(cameraId, true);
                         Thread.sleep(duration);
 
