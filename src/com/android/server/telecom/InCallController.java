@@ -46,6 +46,7 @@ import android.os.RemoteException;
 import android.os.Trace;
 import android.os.UserHandle;
 import android.os.UserManager;
+import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.provider.Settings;
 import android.telecom.CallAudioState;
@@ -89,6 +90,11 @@ public class InCallController extends CallsManagerListenerBase implements
         AppOpsManager.OnOpActiveChangedListener {
     public static final String NOTIFICATION_TAG = InCallController.class.getSimpleName();
     public static final int IN_CALL_SERVICE_NOTIFICATION_ID = 3;
+
+    private static final VibrationEffect CALL_CONNECT_EFFECT =
+            VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK);
+    private static final VibrationEffect CALL_DISCONNECT_EFFECT =
+            VibrationEffect.createPredefined(VibrationEffect.EFFECT_DOUBLE_CLICK);
 
     public class InCallServiceConnection {
         /**
@@ -1050,6 +1056,8 @@ public class InCallController extends CallsManagerListenerBase implements
     private ArraySet<String> mAllCarrierPrivilegedApps = new ArraySet<>();
     private ArraySet<String> mActiveCarrierPrivilegedApps = new ArraySet<>();
 
+    private final Vibrator mVibrator;
+
     public InCallController(Context context, TelecomSystem.SyncRoot lock, CallsManager callsManager,
             SystemStateHelper systemStateHelper, DefaultDialerCache defaultDialerCache,
             Timeouts.Adapter timeoutsAdapter, EmergencyCallHelper emergencyCallHelper,
@@ -1057,6 +1065,7 @@ public class InCallController extends CallsManagerListenerBase implements
         mContext = context;
         mAppOpsManager = context.getSystemService(AppOpsManager.class);
         mSensorPrivacyManager = context.getSystemService(SensorPrivacyManager.class);
+        mVibrator = context.getSystemService(Vibrator.class);
         mLock = lock;
         mCallsManager = callsManager;
         mSystemStateHelper = systemStateHelper;
@@ -1314,19 +1323,17 @@ public class InCallController extends CallsManagerListenerBase implements
             Settings.System.VIBRATE_ON_DISCONNECT, 0, UserHandle.USER_CURRENT) == 1;
 
         if (oldState == CallState.DIALING && newState == CallState.ACTIVE && vibrateOnConnect) {
-            vibrate(100, 200, 0);
-        } else if (oldState == CallState.ACTIVE && newState == CallState.DISCONNECTED
-                && vibrateOnDisconnect) {
-            vibrate(100, 200, 0);
+            vibrate(CALL_CONNECT_EFFECT);
+        } else if (oldState == CallState.ACTIVE && newState == CallState.DISCONNECTED && vibrateOnDisconnect) {
+            vibrate(CALL_DISCONNECT_EFFECT);
         }
         updateCall(call);
     }
 
-    public void vibrate(int v1, int p1, int v2) {
-        long[] pattern = new long[] {
-            0, v1, p1, v2
-        };
-        ((Vibrator) mContext.getSystemService(Context.VIBRATOR_SERVICE)).vibrate(pattern, -1);
+    public void vibrate(VibrationEffect effect) {
+        if (mVibrator.hasVibrator()) {
+            mVibrator.vibrate(effect);
+        }
     }
 
     @Override
